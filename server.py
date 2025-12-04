@@ -9,6 +9,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
 from reader3 import Book, BookMetadata, ChapterContent, TOCEntry
+from summarizer import summarize_page
 
 app = FastAPI()
 templates = Jinja2Templates(directory="templates")
@@ -76,6 +77,8 @@ async def read_chapter(request: Request, book_id: str, chapter_index: int):
     prev_idx = chapter_index - 1 if chapter_index > 0 else None
     next_idx = chapter_index + 1 if chapter_index < len(book.spine) - 1 else None
 
+    summary = 1
+
     return templates.TemplateResponse("reader.html", {
         "request": request,
         "book": book,
@@ -103,6 +106,39 @@ async def serve_image(book_id: str, image_name: str):
         raise HTTPException(status_code=404, detail="Image not found")
 
     return FileResponse(img_path)
+
+@app.get("/api/summarize/{book_id}/{chapter_index}")
+async def summarize_chapter(book_id: str, chapter_index: int):
+    """
+    Generate a summary for a specific chapter using Qwen 3:4B via Ollama.
+    """
+    book = load_book_cached(book_id)
+    if not book:
+        raise HTTPException(status_code=404, detail="Book not found")
+
+    if chapter_index < 0 or chapter_index >= len(book.spine):
+        raise HTTPException(status_code=404, detail="Chapter not found")
+
+    current_chapter = book.spine[chapter_index]
+
+    # Use the summarizer to generate AI summary
+    summary_text, error = summarize_page(current_chapter.content)
+
+    if error:
+        return {
+            "success": False,
+            "summary": "",
+            "error": f"Failed to generate summary: {error}",
+            "chapter_index": chapter_index,
+            "chapter_title": current_chapter.title
+        }
+
+    return {
+        "success": True,
+        "summary": summary_text,
+        "chapter_index": chapter_index,
+        "chapter_title": current_chapter.title
+    }
 
 if __name__ == "__main__":
     import uvicorn

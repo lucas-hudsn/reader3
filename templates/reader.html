@@ -36,6 +36,16 @@
         .nav-btn:hover { background: #3498db; color: white; }
         .nav-btn.disabled { opacity: 0.5; pointer-events: none; border-color: #ccc; color: #ccc; }
 
+        /* Summary Section */
+        .summary-section { margin-top: 40px; padding-top: 30px; border-top: 2px solid #e9ecef; }
+        .summarize-btn { background: #27ae60; color: white; border: none; padding: 12px 24px; border-radius: 4px; font-size: 1em; font-weight: bold; cursor: pointer; transition: all 0.2s; font-family: -apple-system, sans-serif; }
+        .summarize-btn:hover { background: #229954; transform: scale(1.02); }
+        .summarize-btn:active { transform: scale(0.98); }
+        .summarize-btn.loading { opacity: 0.7; cursor: not-allowed; }
+        .summary-content { margin-top: 25px; padding: 20px; background: #f0f8ff; border-left: 4px solid #3498db; border-radius: 4px; }
+        .summary-content h3 { margin-top: 0; color: #2c3e50; font-family: -apple-system, sans-serif; }
+        .summary-content p { margin-bottom: 0; color: #34495e; font-size: 1em; line-height: 1.6; }
+
     </style>
 </head>
 <body>
@@ -101,6 +111,15 @@
                 {{ current_chapter.content | safe }}
             </div>
 
+            <!-- Summary Section -->
+            <div class="summary-section">
+                <button id="summarizeBtn" class="summarize-btn">Generate Summary</button>
+                <div id="summaryContent" class="summary-content" style="display: none;">
+                    <h3>Page Summary</h3>
+                    <p id="summaryText"></p>
+                </div>
+            </div>
+
             <div class="chapter-nav">
                 {% if prev_idx is not none %}
                     <a href="/read/{{ book_id }}/{{ prev_idx }}" class="nav-btn">← Previous</a>
@@ -149,6 +168,38 @@
                 console.log("Could not find index for", filename);
             }
         }
+
+        // Summary button functionality
+        document.getElementById('summarizeBtn').addEventListener('click', async function() {
+            const btn = this;
+            const summaryContent = document.getElementById('summaryContent');
+            const summaryText = document.getElementById('summaryText');
+
+            // Show loading state
+            btn.classList.add('loading');
+            btn.textContent = 'Generating...';
+
+            try {
+                const response = await fetch('/api/summarize/{{ book_id }}/{{ chapter_index }}');
+                const data = await response.json();
+                
+                if (data.success) {
+                    summaryText.textContent = data.summary;
+                    summaryContent.style.display = 'block';
+                } else {
+                    summaryText.textContent = 'Error generating summary: ' + data.error;
+                    summaryContent.style.display = 'block';
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                summaryText.textContent = 'Failed to generate summary. Please try again.';
+                summaryContent.style.display = 'block';
+            } finally {
+                // Reset button state
+                btn.classList.remove('loading');
+                btn.textContent = 'Generate Summary';
+            }
+        });
     </script>
 </body>
 </html>
